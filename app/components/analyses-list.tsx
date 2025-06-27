@@ -24,6 +24,7 @@ import {
   Play,
   Pause,
   BarChart3,
+  Download,
 } from "lucide-react"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 
@@ -211,6 +212,11 @@ export default function AnalysesList({ onAnalysisSelect, onUserProfileClick, onH
     onAnalysisSelect(newAnalysis)
   }
 
+  const handleOpenFromIntegral = () => {
+    // Placeholder for opening from Integral
+    alert("Opening from Integral - Not yet implemented")
+  }
+
   const filteredAnalyses = analyses
     .filter((analysis) => {
       const matchesSearch =
@@ -253,66 +259,76 @@ export default function AnalysesList({ onAnalysisSelect, onUserProfileClick, onH
           <h1 className="text-2xl font-bold text-gray-900">Recent Analyses</h1>
           <p className="text-gray-600">Manage and view your data analyses</p>
         </div>
-        <Dialog open={showNewAnalysisDialog} onOpenChange={setShowNewAnalysisDialog}>
-          <DialogTrigger asChild>
-            <Button className="bg-blue-600 hover:bg-blue-700">
-              <Plus className="h-4 w-4 mr-2" />
-              New Analysis
-            </Button>
-          </DialogTrigger>
-          <DialogContent className="sm:max-w-[425px]">
-            <DialogHeader>
-              <DialogTitle>Create New Analysis</DialogTitle>
-            </DialogHeader>
-            <div className="space-y-4 py-4">
-              <div>
-                <Label htmlFor="analysis-name">Analysis Name</Label>
-                <Input
-                  id="analysis-name"
-                  value={newAnalysisName}
-                  onChange={(e) => setNewAnalysisName(e.target.value)}
-                  placeholder="Enter analysis name"
-                />
+        <div className="flex gap-3">
+          <Button
+            variant="outline"
+            onClick={handleOpenFromIntegral}
+            className="border-blue-600 text-blue-600 hover:bg-blue-50 bg-transparent"
+          >
+            <Download className="h-4 w-4 mr-2" />
+            Open from Integral
+          </Button>
+          <Dialog open={showNewAnalysisDialog} onOpenChange={setShowNewAnalysisDialog}>
+            <DialogTrigger asChild>
+              <Button className="bg-blue-600 hover:bg-blue-700">
+                <Plus className="h-4 w-4 mr-2" />
+                New Analysis
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="sm:max-w-[425px]">
+              <DialogHeader>
+                <DialogTitle>Create New Analysis</DialogTitle>
+              </DialogHeader>
+              <div className="space-y-4 py-4">
+                <div>
+                  <Label htmlFor="analysis-name">Analysis Name</Label>
+                  <Input
+                    id="analysis-name"
+                    value={newAnalysisName}
+                    onChange={(e) => setNewAnalysisName(e.target.value)}
+                    placeholder="Enter analysis name"
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="analysis-description">Description</Label>
+                  <Textarea
+                    id="analysis-description"
+                    value={newAnalysisDescription}
+                    onChange={(e) => setNewAnalysisDescription(e.target.value)}
+                    placeholder="Describe your analysis"
+                    rows={3}
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="analysis-type">Analysis Type</Label>
+                  <Select value={newAnalysisType} onValueChange={setNewAnalysisType}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select analysis type" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="population_pk">Population PK</SelectItem>
+                      <SelectItem value="pkpd">PK/PD</SelectItem>
+                      <SelectItem value="exposure_response">Exposure-Response</SelectItem>
+                      <SelectItem value="bioequivalence">Bioequivalence</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="flex justify-end space-x-2 pt-4">
+                  <Button variant="outline" onClick={() => setShowNewAnalysisDialog(false)}>
+                    Cancel
+                  </Button>
+                  <Button
+                    onClick={handleCreateNewAnalysis}
+                    disabled={!newAnalysisName || !newAnalysisDescription || !newAnalysisType}
+                    className="bg-blue-600 hover:bg-blue-700"
+                  >
+                    Create Analysis
+                  </Button>
+                </div>
               </div>
-              <div>
-                <Label htmlFor="analysis-description">Description</Label>
-                <Textarea
-                  id="analysis-description"
-                  value={newAnalysisDescription}
-                  onChange={(e) => setNewAnalysisDescription(e.target.value)}
-                  placeholder="Describe your analysis"
-                  rows={3}
-                />
-              </div>
-              <div>
-                <Label htmlFor="analysis-type">Analysis Type</Label>
-                <Select value={newAnalysisType} onValueChange={setNewAnalysisType}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select analysis type" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="population_pk">Population PK</SelectItem>
-                    <SelectItem value="pkpd">PK/PD</SelectItem>
-                    <SelectItem value="exposure_response">Exposure-Response</SelectItem>
-                    <SelectItem value="bioequivalence">Bioequivalence</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="flex justify-end space-x-2 pt-4">
-                <Button variant="outline" onClick={() => setShowNewAnalysisDialog(false)}>
-                  Cancel
-                </Button>
-                <Button
-                  onClick={handleCreateNewAnalysis}
-                  disabled={!newAnalysisName || !newAnalysisDescription || !newAnalysisType}
-                  className="bg-blue-600 hover:bg-blue-700"
-                >
-                  Create Analysis
-                </Button>
-              </div>
-            </div>
-          </DialogContent>
-        </Dialog>
+            </DialogContent>
+          </Dialog>
+        </div>
       </div>
 
       {/* Filters and Search */}
