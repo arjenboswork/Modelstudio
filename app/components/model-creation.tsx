@@ -43,7 +43,12 @@ interface ModelCreationProps {
   onCancel: () => void
 }
 
-export default function ModelCreation({ analysisId, existingModels, onModelCreated, onCancel }: ModelCreationProps) {
+export default function ModelCreation({
+  analysisId,
+  existingModels = [], // ✅ guarantees we always have an array
+  onModelCreated,
+  onCancel,
+}: ModelCreationProps) {
   const [selectedOption, setSelectedOption] = useState<"empty" | "existing" | "library" | "wizard" | "scratch" | null>(
     null,
   )
@@ -132,7 +137,7 @@ test() {
     onModelCreated(newModel)
   }
 
-  const getAllModelsFlat = (models: Model[]): Model[] => {
+  const getAllModelsFlat = (models: Model[] = []): Model[] => {
     const result: Model[] = []
     models.forEach((model) => {
       result.push(model)
