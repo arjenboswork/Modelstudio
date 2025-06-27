@@ -5,8 +5,11 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
+import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
 import {
   Plus,
   Search,
@@ -121,11 +124,17 @@ const mockAnalyses: Analysis[] = [
 ]
 
 export default function AnalysesList({ onAnalysisSelect, onUserProfileClick, onHelpClick }: AnalysesListProps) {
-  const [analyses] = useState<Analysis[]>(mockAnalyses)
+  const [analyses, setAnalyses] = useState<Analysis[]>(mockAnalyses)
   const [searchTerm, setSearchTerm] = useState("")
   const [statusFilter, setStatusFilter] = useState<string>("all")
   const [typeFilter, setTypeFilter] = useState<string>("all")
   const [sortBy, setSortBy] = useState<string>("lastModified")
+  const [showNewAnalysisDialog, setShowNewAnalysisDialog] = useState(false)
+
+  // New analysis form state
+  const [newAnalysisName, setNewAnalysisName] = useState("")
+  const [newAnalysisDescription, setNewAnalysisDescription] = useState("")
+  const [newAnalysisType, setNewAnalysisType] = useState<string>("")
 
   const getStatusIcon = (status: string) => {
     switch (status) {
@@ -176,6 +185,32 @@ export default function AnalysesList({ onAnalysisSelect, onUserProfileClick, onH
     }
   }
 
+  const handleCreateNewAnalysis = () => {
+    if (!newAnalysisName || !newAnalysisDescription || !newAnalysisType) return
+
+    const newAnalysis: Analysis = {
+      id: Date.now().toString(),
+      name: newAnalysisName,
+      type: newAnalysisType as Analysis["type"],
+      status: "draft",
+      created: new Date().toISOString().split("T")[0],
+      lastModified: new Date().toISOString().split("T")[0],
+      author: "Current User",
+      description: newAnalysisDescription,
+      models: 0,
+      datasets: 0,
+    }
+
+    setAnalyses([newAnalysis, ...analyses])
+    setShowNewAnalysisDialog(false)
+    setNewAnalysisName("")
+    setNewAnalysisDescription("")
+    setNewAnalysisType("")
+
+    // Automatically select the new analysis
+    onAnalysisSelect(newAnalysis)
+  }
+
   const filteredAnalyses = analyses
     .filter((analysis) => {
       const matchesSearch =
@@ -218,10 +253,66 @@ export default function AnalysesList({ onAnalysisSelect, onUserProfileClick, onH
           <h1 className="text-2xl font-bold text-gray-900">Recent Analyses</h1>
           <p className="text-gray-600">Manage and view your data analyses</p>
         </div>
-        <Button className="bg-blue-600 hover:bg-blue-700">
-          <Plus className="h-4 w-4 mr-2" />
-          New Analysis
-        </Button>
+        <Dialog open={showNewAnalysisDialog} onOpenChange={setShowNewAnalysisDialog}>
+          <DialogTrigger asChild>
+            <Button className="bg-blue-600 hover:bg-blue-700">
+              <Plus className="h-4 w-4 mr-2" />
+              New Analysis
+            </Button>
+          </DialogTrigger>
+          <DialogContent className="sm:max-w-[425px]">
+            <DialogHeader>
+              <DialogTitle>Create New Analysis</DialogTitle>
+            </DialogHeader>
+            <div className="space-y-4 py-4">
+              <div>
+                <Label htmlFor="analysis-name">Analysis Name</Label>
+                <Input
+                  id="analysis-name"
+                  value={newAnalysisName}
+                  onChange={(e) => setNewAnalysisName(e.target.value)}
+                  placeholder="Enter analysis name"
+                />
+              </div>
+              <div>
+                <Label htmlFor="analysis-description">Description</Label>
+                <Textarea
+                  id="analysis-description"
+                  value={newAnalysisDescription}
+                  onChange={(e) => setNewAnalysisDescription(e.target.value)}
+                  placeholder="Describe your analysis"
+                  rows={3}
+                />
+              </div>
+              <div>
+                <Label htmlFor="analysis-type">Analysis Type</Label>
+                <Select value={newAnalysisType} onValueChange={setNewAnalysisType}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select analysis type" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="population_pk">Population PK</SelectItem>
+                    <SelectItem value="pkpd">PK/PD</SelectItem>
+                    <SelectItem value="exposure_response">Exposure-Response</SelectItem>
+                    <SelectItem value="bioequivalence">Bioequivalence</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="flex justify-end space-x-2 pt-4">
+                <Button variant="outline" onClick={() => setShowNewAnalysisDialog(false)}>
+                  Cancel
+                </Button>
+                <Button
+                  onClick={handleCreateNewAnalysis}
+                  disabled={!newAnalysisName || !newAnalysisDescription || !newAnalysisType}
+                  className="bg-blue-600 hover:bg-blue-700"
+                >
+                  Create Analysis
+                </Button>
+              </div>
+            </div>
+          </DialogContent>
+        </Dialog>
       </div>
 
       {/* Filters and Search */}
@@ -420,7 +511,7 @@ export default function AnalysesList({ onAnalysisSelect, onUserProfileClick, onH
               ? "Try adjusting your search or filters"
               : "Get started by creating your first analysis"}
           </p>
-          <Button className="bg-blue-600 hover:bg-blue-700">
+          <Button className="bg-blue-600 hover:bg-blue-700" onClick={() => setShowNewAnalysisDialog(true)}>
             <Plus className="h-4 w-4 mr-2" />
             New Analysis
           </Button>

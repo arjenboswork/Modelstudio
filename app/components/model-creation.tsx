@@ -3,472 +3,447 @@
 import { useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Badge } from "@/components/ui/badge"
-import { ArrowLeft, Copy, BookOpen, Plus, ChevronRight, Wand2, Code } from "lucide-react"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import ModelWizard from "./model-wizard"
-import ModelLibrary from "./model-library"
+import { Badge } from "@/components/ui/badge"
+import { ArrowLeft, FileText, Wand2, Copy, Code, Play, BookOpen, Lightbulb } from "lucide-react"
 
 interface Model {
   id: string
   name: string
-  type: "population_pk" | "pkpd" | "exposure_response"
-  ofv?: number
-  rse?: number
-  children?: Model[]
-  isExpanded?: boolean
-}
-
-interface LibraryModel {
-  id: string
-  name: string
-  type: "population_pk" | "pkpd" | "exposure_response"
+  type: string
   description: string
   category: string
   complexity: "Basic" | "Intermediate" | "Advanced"
-  pmlCode: string
+  parameters: number
+  equations: number
+  lastModified: string
   author: string
   tags: string[]
-  indication: string
-  administration: string
+  pmlCode?: string
 }
 
 interface ModelCreationProps {
-  analysisId: string
-  existingModels: Model[]
-  onModelCreated: (model: Model) => void
-  onCancel: () => void
+  onBack: () => void
+  onModelCreated?: (model: Model) => void
+  onCancel?: () => void
+  existingModels?: Model[]
 }
+
+const mockModels: Model[] = [
+  {
+    id: "1",
+    name: "One Compartment IV",
+    type: "Pharmacokinetic",
+    description: "Single compartment model with IV administration",
+    category: "Basic PK",
+    complexity: "Basic",
+    parameters: 3,
+    equations: 2,
+    lastModified: "2024-01-15",
+    author: "System",
+    tags: ["PK", "IV", "Linear"],
+  },
+  {
+    id: "2",
+    name: "Two Compartment Oral",
+    type: "Pharmacokinetic",
+    description: "Two compartment model with first-order absorption",
+    category: "Basic PK",
+    complexity: "Intermediate",
+    parameters: 6,
+    equations: 4,
+    lastModified: "2024-01-18",
+    author: "System",
+    tags: ["PK", "Oral", "Absorption"],
+  },
+  {
+    id: "3",
+    name: "Emax PD Model",
+    type: "Pharmacodynamic",
+    description: "Effect compartment with Emax relationship",
+    category: "PK/PD",
+    complexity: "Intermediate",
+    parameters: 4,
+    equations: 3,
+    lastModified: "2024-01-20",
+    author: "System",
+    tags: ["PD", "Emax", "Effect"],
+  },
+]
 
 export default function ModelCreation({
-  analysisId,
-  existingModels = [], // ✅ guarantees we always have an array
-  onModelCreated,
-  onCancel,
+  onBack,
+  onModelCreated = () => {},
+  onCancel = () => {},
+  existingModels = [],
 }: ModelCreationProps) {
-  const [selectedOption, setSelectedOption] = useState<"empty" | "existing" | "library" | "wizard" | "scratch" | null>(
-    null,
-  )
-  const [selectedExistingModel, setSelectedExistingModel] = useState<Model | null>(null)
-  const [scratchModelData, setScratchModelData] = useState({
-    name: "",
-    description: "",
-    type: "population_pk" as "population_pk" | "pkpd" | "exposure_response",
-    pmlCode: `# PML Model Code
-# Define your pharmacometric model here
+  const [creationMethod, setCreationMethod] = useState<string>("")
+  const [selectedTemplate, setSelectedTemplate] = useState<Model | null>(null)
+  const [showDetails, setShowDetails] = useState(false)
 
-test() {
-  # Model structure
+  // Form state for creating from scratch
+  const [modelName, setModelName] = useState("")
+  const [modelDescription, setModelDescription] = useState("")
+  const [modelType, setModelType] = useState("")
+  const [pmlCode, setPmlCode] = useState(`test(){
   cfMicro(A1, Cl/V, first = (Dose / V))
-  
-  # Observations
-  C = A1 / V
-  observe(C)
-  
-  # Parameters
-  stparm(Cl = tvCl)
-  stparm(V = tvV)
-  
-  # Fixed effects
-  fixef(tvCl = c(, 1, ))
-  fixef(tvV = c(, 10, ))
-  
-  # Random effects
-  ranef(diag(nCl, nV) = c(0.1, 0.1))
-  
-  # Error model
-  error(CEps = 0.1)
 }
-`,
-  })
+
+fixef{
+  Cl ~ 1
+  V ~ 1
+}
+
+ranef{
+  Cl ~ 1
+  V ~ 1
+}`)
+
+  const getAllModelsFlat = () => {
+    const allModels = [...mockModels, ...existingModels]
+    return allModels
+  }
+
+  const handleMethodSelect = (method: string) => {
+    setCreationMethod(method)
+    if (method === "scratch") {
+      setShowDetails(true)
+    }
+  }
+
+  const handleTemplateSelect = (model: Model) => {
+    setSelectedTemplate(model)
+    setShowDetails(true)
+  }
 
   const handleCreateFromEmpty = () => {
     const newModel: Model = {
       id: Date.now().toString(),
-      name: "New Empty Model",
-      type: "population_pk",
-      children: [],
-      isExpanded: false,
+      name: modelName,
+      type: modelType,
+      description: modelDescription,
+      category: "Custom",
+      complexity: "Basic",
+      parameters: 0,
+      equations: 0,
+      lastModified: new Date().toISOString().split("T")[0],
+      author: "User",
+      tags: ["Custom"],
+      pmlCode: pmlCode,
     }
+
     onModelCreated(newModel)
   }
 
-  const handleCreateFromExisting = () => {
-    if (selectedExistingModel) {
+  const handleCreateFromTemplate = () => {
+    if (selectedTemplate) {
       const newModel: Model = {
+        ...selectedTemplate,
         id: Date.now().toString(),
-        name: `${selectedExistingModel.name} (Copy)`,
-        type: selectedExistingModel.type,
-        children: [],
-        isExpanded: false,
+        name: modelName || selectedTemplate.name,
+        description: modelDescription || selectedTemplate.description,
+        lastModified: new Date().toISOString().split("T")[0],
+        author: "User",
       }
+
       onModelCreated(newModel)
     }
   }
 
-  const handleCreateFromLibrary = (libraryModel: LibraryModel) => {
-    const newModel: Model = {
-      id: Date.now().toString(),
-      name: libraryModel.name,
-      type: libraryModel.type,
-      children: [],
-      isExpanded: false,
-    }
-    onModelCreated(newModel)
-  }
-
-  const handleWizardComplete = (wizardModel: Model) => {
-    onModelCreated(wizardModel)
-  }
-
-  const handleCreateFromScratch = () => {
-    if (!scratchModelData.name.trim()) return
-
-    const newModel: Model = {
-      id: Date.now().toString(),
-      name: scratchModelData.name,
-      type: scratchModelData.type,
-      children: [],
-      isExpanded: false,
-    }
-    onModelCreated(newModel)
-  }
-
-  const getAllModelsFlat = (models: Model[] = []): Model[] => {
-    const result: Model[] = []
-    models.forEach((model) => {
-      result.push(model)
-      if (model.children) {
-        result.push(...getAllModelsFlat(model.children))
-      }
-    })
-    return result
-  }
-
-  const flatExistingModels = getAllModelsFlat(existingModels)
-
-  if (selectedOption === "wizard") {
+  if (showDetails) {
     return (
-      <ModelWizard
-        analysisId={analysisId}
-        onModelCreated={handleWizardComplete}
-        onCancel={() => setSelectedOption(null)}
-      />
-    )
-  }
-
-  if (selectedOption === "scratch") {
-    return (
-      <Card className="h-full">
-        <CardHeader>
-          <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-2">
-              <Button variant="ghost" onClick={() => setSelectedOption(null)} className="p-0 h-auto">
-                <ArrowLeft className="h-4 w-4 mr-2" />
-                Back
-              </Button>
-              <CardTitle>Create Model from Scratch</CardTitle>
-            </div>
-            <Button
-              onClick={handleCreateFromScratch}
-              disabled={!scratchModelData.name.trim()}
-              className="bg-black hover:bg-gray-800"
-            >
-              Create & Start Simulation
+      <div className="space-y-6">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center space-x-4">
+            <Button variant="ghost" onClick={() => setShowDetails(false)} className="p-0 h-auto">
+              <ArrowLeft className="h-4 w-4 mr-2" />
+              Back
             </Button>
+            <h1 className="text-2xl font-bold text-gray-900">
+              {creationMethod === "scratch" ? "Create Model from Scratch" : "Create from Template"}
+            </h1>
           </div>
-        </CardHeader>
-        <CardContent className="space-y-6">
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            {/* Model Details */}
-            <div className="space-y-4">
+        </div>
+
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <Card>
+            <CardHeader>
+              <CardTitle>Model Details</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
               <div>
-                <Label htmlFor="modelName">Model Name *</Label>
+                <Label htmlFor="name">Model Name</Label>
                 <Input
-                  id="modelName"
-                  value={scratchModelData.name}
-                  onChange={(e) => setScratchModelData({ ...scratchModelData, name: e.target.value })}
-                  placeholder="Enter model name..."
-                  className="mt-1"
+                  id="name"
+                  value={modelName}
+                  onChange={(e) => setModelName(e.target.value)}
+                  placeholder={selectedTemplate?.name || "Enter model name"}
                 />
               </div>
 
               <div>
-                <Label htmlFor="modelType">Model Type</Label>
-                <Select
-                  value={scratchModelData.type}
-                  onValueChange={(value: "population_pk" | "pkpd" | "exposure_response") =>
-                    setScratchModelData({ ...scratchModelData, type: value })
-                  }
-                >
-                  <SelectTrigger className="mt-1">
-                    <SelectValue />
+                <Label htmlFor="description">Description</Label>
+                <Textarea
+                  id="description"
+                  value={modelDescription}
+                  onChange={(e) => setModelDescription(e.target.value)}
+                  placeholder={selectedTemplate?.description || "Describe your model"}
+                  rows={3}
+                />
+              </div>
+
+              <div>
+                <Label htmlFor="type">Model Type</Label>
+                <Select value={modelType} onValueChange={setModelType}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select model type" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="population_pk">Population PK</SelectItem>
-                    <SelectItem value="pkpd">PK/PD</SelectItem>
-                    <SelectItem value="exposure_response">Exposure-Response</SelectItem>
+                    <SelectItem value="Pharmacokinetic">Pharmacokinetic</SelectItem>
+                    <SelectItem value="Pharmacodynamic">Pharmacodynamic</SelectItem>
+                    <SelectItem value="PK/PD">PK/PD</SelectItem>
+                    <SelectItem value="PBPK">PBPK</SelectItem>
+                    <SelectItem value="QSP">QSP</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
 
-              <div>
-                <Label htmlFor="modelDescription">Description</Label>
-                <Textarea
-                  id="modelDescription"
-                  value={scratchModelData.description}
-                  onChange={(e) => setScratchModelData({ ...scratchModelData, description: e.target.value })}
-                  placeholder="Describe your model..."
-                  rows={4}
-                  className="mt-1"
-                />
-              </div>
+              {creationMethod === "scratch" && (
+                <div className="flex items-center justify-between pt-4">
+                  <Button
+                    onClick={handleCreateFromEmpty}
+                    className="bg-blue-600 hover:bg-blue-700"
+                    disabled={!modelName || !modelDescription || !modelType}
+                  >
+                    <Play className="h-4 w-4 mr-2" />
+                    Create & Start Simulation
+                  </Button>
+                </div>
+              )}
 
-              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-                <h3 className="font-medium text-blue-900 mb-2">Getting Started</h3>
-                <ul className="text-sm text-blue-800 space-y-1">
-                  <li>• Modify the PML code template on the right</li>
-                  <li>• Define your structural model and parameters</li>
-                  <li>• Set initial parameter estimates</li>
-                  <li>• Configure error models and random effects</li>
-                </ul>
-              </div>
-            </div>
+              {creationMethod === "template" && (
+                <div className="flex items-center justify-between pt-4">
+                  <Button
+                    onClick={handleCreateFromTemplate}
+                    className="bg-blue-600 hover:bg-blue-700"
+                    disabled={!modelName}
+                  >
+                    <Play className="h-4 w-4 mr-2" />
+                    Create & Start Simulation
+                  </Button>
+                </div>
+              )}
+            </CardContent>
+          </Card>
 
-            {/* PML Code Editor */}
-            <div className="space-y-4">
-              <div>
-                <Label htmlFor="pmlCode">PML Code</Label>
+          {creationMethod === "scratch" && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center space-x-2">
+                  <Code className="h-5 w-5" />
+                  <span>PML Code</span>
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
                 <Textarea
-                  id="pmlCode"
-                  value={scratchModelData.pmlCode}
-                  onChange={(e) => setScratchModelData({ ...scratchModelData, pmlCode: e.target.value })}
-                  rows={20}
-                  className="mt-1 font-mono text-sm"
+                  value={pmlCode}
+                  onChange={(e) => setPmlCode(e.target.value)}
+                  className="font-mono text-sm min-h-[300px]"
                   placeholder="Enter your PML code here..."
                 />
-              </div>
-
-              <div className="flex space-x-2">
-                <Button variant="outline" size="sm">
-                  <Code className="h-4 w-4 mr-2" />
-                  Validate Syntax
-                </Button>
-                <Button variant="outline" size="sm">
-                  Load Template
-                </Button>
-              </div>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-    )
-  }
-
-  if (selectedOption === "existing") {
-    return (
-      <Card className="h-full">
-        <CardHeader>
-          <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-2">
-              <Button variant="ghost" onClick={() => setSelectedOption(null)} className="p-0 h-auto">
-                <ArrowLeft className="h-4 w-4 mr-2" />
-                Back
-              </Button>
-              <CardTitle>Derive from Existing Model</CardTitle>
-            </div>
-            <Button
-              onClick={handleCreateFromExisting}
-              disabled={!selectedExistingModel}
-              className="bg-black hover:bg-gray-800"
-            >
-              Create Model
-            </Button>
-          </div>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-3">
-            {flatExistingModels.length === 0 ? (
-              <div className="text-center py-8">
-                <Copy className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-                <h3 className="text-lg font-medium text-gray-900 mb-2">No existing models</h3>
-                <p className="text-gray-600">Create your first model to derive from existing ones</p>
-              </div>
-            ) : (
-              flatExistingModels.map((model) => (
-                <Card
-                  key={model.id}
-                  className={`cursor-pointer transition-all ${
-                    selectedExistingModel?.id === model.id
-                      ? "ring-2 ring-black bg-gray-50"
-                      : "hover:bg-gray-50 border-gray-200"
-                  }`}
-                  onClick={() => setSelectedExistingModel(model)}
-                >
-                  <CardContent className="p-4">
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <h3 className="font-medium text-gray-900">{model.name}</h3>
-                        <p className="text-sm text-gray-600 capitalize">{model.type.replace("_", " ")}</p>
-                        {model.ofv && (
-                          <div className="flex items-center space-x-4 mt-1">
-                            <span className="text-xs text-gray-500">OFV: {model.ofv.toFixed(1)}</span>
-                            {model.rse && <span className="text-xs text-gray-500">RSE: {model.rse.toFixed(1)}%</span>}
-                          </div>
-                        )}
-                      </div>
-                      <ChevronRight className="h-5 w-5 text-gray-400" />
+                <div className="mt-4 p-3 bg-blue-50 rounded-lg">
+                  <div className="flex items-start space-x-2">
+                    <Lightbulb className="h-4 w-4 text-blue-600 mt-0.5 flex-shrink-0" />
+                    <div className="text-sm text-blue-800">
+                      <p className="font-medium mb-1">PML Tips:</p>
+                      <ul className="text-xs space-y-1">
+                        <li>• Use cfMicro() for compartmental models</li>
+                        <li>• Define fixef{} for population parameters</li>
+                        <li>• Add ranef{} for random effects</li>
+                        <li>• Specify dosing with Dose/V for initial conditions</li>
+                      </ul>
                     </div>
-                  </CardContent>
-                </Card>
-              ))
-            )}
-          </div>
-        </CardContent>
-      </Card>
-    )
-  }
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          )}
 
-  if (selectedOption === "library") {
-    return <ModelLibrary onModelSelected={handleCreateFromLibrary} onCancel={() => setSelectedOption(null)} />
+          {creationMethod === "template" && selectedTemplate && (
+            <Card>
+              <CardHeader>
+                <CardTitle>Template Preview</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-3">
+                  <div className="flex items-center space-x-2">
+                    <Badge variant="outline" className="bg-purple-100 text-purple-800">
+                      {selectedTemplate.type}
+                    </Badge>
+                    <Badge
+                      variant="outline"
+                      className={
+                        selectedTemplate.complexity === "Basic"
+                          ? "bg-green-100 text-green-800"
+                          : selectedTemplate.complexity === "Intermediate"
+                            ? "bg-yellow-100 text-yellow-800"
+                            : "bg-red-100 text-red-800"
+                      }
+                    >
+                      {selectedTemplate.complexity}
+                    </Badge>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4 text-sm">
+                    <div>
+                      <p className="text-gray-600">Parameters</p>
+                      <p className="font-medium">{selectedTemplate.parameters}</p>
+                    </div>
+                    <div>
+                      <p className="text-gray-600">Equations</p>
+                      <p className="font-medium">{selectedTemplate.equations}</p>
+                    </div>
+                  </div>
+
+                  <div>
+                    <p className="text-gray-600 text-sm">Tags</p>
+                    <div className="flex flex-wrap gap-1 mt-1">
+                      {selectedTemplate.tags.map((tag) => (
+                        <Badge key={tag} variant="secondary" className="text-xs">
+                          {tag}
+                        </Badge>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+        </div>
+      </div>
+    )
   }
 
   return (
-    <Card className="h-full">
-      <CardHeader>
-        <div className="flex items-center justify-between">
-          <div className="flex items-center space-x-2">
-            <Button variant="ghost" onClick={onCancel} className="p-0 h-auto">
-              <ArrowLeft className="h-4 w-4 mr-2" />
-              Back
-            </Button>
-            <CardTitle>Create New Model</CardTitle>
+    <div className="space-y-6">
+      <div className="flex items-center justify-between">
+        <div className="flex items-center space-x-4">
+          <Button variant="ghost" onClick={onBack} className="p-0 h-auto">
+            <ArrowLeft className="h-4 w-4 mr-2" />
+            Back
+          </Button>
+          <div>
+            <h1 className="text-2xl font-bold text-gray-900">Create New Model</h1>
+            <p className="text-gray-600">Choose how you'd like to create your model</p>
           </div>
         </div>
-      </CardHeader>
-      <CardContent>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 h-full">
-          {/* Start with Empty Model */}
-          <Card
-            className="cursor-pointer transition-all hover:shadow-lg hover:scale-105 border-2 border-dashed border-gray-300 hover:border-black"
-            onClick={handleCreateFromEmpty}
-          >
-            <CardContent className="flex flex-col items-center justify-center p-6 text-center h-full min-h-[280px]">
-              <div className="w-14 h-14 bg-gray-100 rounded-full flex items-center justify-center mb-3">
-                <Plus className="h-7 w-7 text-gray-600" />
-              </div>
-              <h3 className="text-lg font-semibold text-gray-900 mb-2">Start with Empty Model</h3>
-              <p className="text-sm text-gray-600 mb-3">
-                Build a completely new nonlinear mixed effects model from scratch with your own specifications.
-              </p>
-              <div className="text-xs text-gray-500">
-                <div>• Define your own structural model</div>
-                <div>• Set custom parameters</div>
-                <div>• Full control over model structure</div>
-              </div>
-            </CardContent>
-          </Card>
+      </div>
 
-          {/* Model Wizard */}
-          <Card
-            className="cursor-pointer transition-all hover:shadow-lg hover:scale-105 border-2 border-gray-300 hover:border-black"
-            onClick={() => setSelectedOption("wizard")}
-          >
-            <CardContent className="flex flex-col items-center justify-center p-6 text-center h-full min-h-[280px]">
-              <div className="w-14 h-14 bg-purple-100 rounded-full flex items-center justify-center mb-3">
-                <Wand2 className="h-7 w-7 text-purple-600" />
-              </div>
-              <h3 className="text-lg font-semibold text-gray-900 mb-2">Start using Model Wizard</h3>
-              <p className="text-sm text-gray-600 mb-3">
-                Step-by-step guided process to create the optimal model based on your study design and objectives.
-              </p>
-              <div className="text-xs text-gray-500">
-                <div>• Guided model selection</div>
-                <div>• Study design optimization</div>
-                <div>• Best practice recommendations</div>
-              </div>
-              <div className="mt-3">
-                <Badge className="bg-purple-100 text-purple-800">Recommended</Badge>
-              </div>
-            </CardContent>
-          </Card>
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <Card
+          className="cursor-pointer hover:shadow-lg transition-shadow border-2 hover:border-blue-200"
+          onClick={() => handleMethodSelect("scratch")}
+        >
+          <CardHeader className="text-center">
+            <div className="mx-auto w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center mb-4">
+              <FileText className="h-6 w-6 text-blue-600" />
+            </div>
+            <CardTitle>From Scratch</CardTitle>
+          </CardHeader>
+          <CardContent className="text-center">
+            <p className="text-gray-600 text-sm">Start with a blank model and write your own PML code</p>
+          </CardContent>
+        </Card>
 
-          {/* Derive from Existing Model */}
-          <Card
-            className="cursor-pointer transition-all hover:shadow-lg hover:scale-105 border-2 border-gray-300 hover:border-black"
-            onClick={() => setSelectedOption("existing")}
-          >
-            <CardContent className="flex flex-col items-center justify-center p-6 text-center h-full min-h-[280px]">
-              <div className="w-14 h-14 bg-blue-100 rounded-full flex items-center justify-center mb-3">
-                <Copy className="h-7 w-7 text-blue-600" />
-              </div>
-              <h3 className="text-lg font-semibold text-gray-900 mb-2">Derive from Existing Model</h3>
-              <p className="text-sm text-gray-600 mb-3">
-                Create a new model based on an existing model in this analysis with modifications.
-              </p>
-              <div className="text-xs text-gray-500">
-                <div>• Copy existing model structure</div>
-                <div>• Modify parameters as needed</div>
-                <div>• Maintain model history</div>
-              </div>
-              <div className="mt-3">
-                <Badge variant="secondary">{flatExistingModels.length} models available</Badge>
-              </div>
-            </CardContent>
-          </Card>
+        <Card
+          className="cursor-pointer hover:shadow-lg transition-shadow border-2 hover:border-purple-200"
+          onClick={() => handleMethodSelect("wizard")}
+        >
+          <CardHeader className="text-center">
+            <div className="mx-auto w-12 h-12 bg-purple-100 rounded-lg flex items-center justify-center mb-4">
+              <Wand2 className="h-6 w-6 text-purple-600" />
+            </div>
+            <CardTitle className="flex items-center justify-center space-x-2">
+              <span>Model Wizard</span>
+              <Badge variant="secondary" className="text-xs">
+                Coming Soon
+              </Badge>
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="text-center">
+            <p className="text-gray-600 text-sm">Use guided steps to build your model interactively</p>
+          </CardContent>
+        </Card>
 
-          {/* Create from Scratch */}
-          <Card
-            className="cursor-pointer transition-all hover:shadow-lg hover:scale-105 border-2 border-gray-300 hover:border-black"
-            onClick={() => setSelectedOption("scratch")}
-          >
-            <CardContent className="flex flex-col items-center justify-center p-6 text-center h-full min-h-[280px]">
-              <div className="w-14 h-14 bg-green-100 rounded-full flex items-center justify-center mb-3">
-                <Code className="h-7 w-7 text-green-600" />
-              </div>
-              <h3 className="text-lg font-semibold text-gray-900 mb-2">Create from Scratch</h3>
-              <p className="text-sm text-gray-600 mb-3">
-                Write your own PML code and define every aspect of your pharmacometric model.
-              </p>
-              <div className="text-xs text-gray-500">
-                <div>• Full PML code control</div>
-                <div>• Custom model structures</div>
-                <div>• Advanced modeling features</div>
-              </div>
-              <div className="mt-3">
-                <Badge variant="outline">Advanced</Badge>
-              </div>
-            </CardContent>
-          </Card>
+        <Card
+          className="cursor-pointer hover:shadow-lg transition-shadow border-2 hover:border-green-200"
+          onClick={() => handleMethodSelect("template")}
+        >
+          <CardHeader className="text-center">
+            <div className="mx-auto w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center mb-4">
+              <Copy className="h-6 w-6 text-green-600" />
+            </div>
+            <CardTitle>From Template</CardTitle>
+          </CardHeader>
+          <CardContent className="text-center">
+            <p className="text-gray-600 text-sm">Start with a pre-built model template and customize it</p>
+          </CardContent>
+        </Card>
+      </div>
 
-          {/* Select from Model Library */}
-          <Card
-            className="cursor-pointer transition-all hover:shadow-lg hover:scale-105 border-2 border-gray-300 hover:border-black col-span-full"
-            onClick={() => setSelectedOption("library")}
-          >
-            <CardContent className="flex flex-col items-center justify-center p-6 text-center h-full min-h-[200px]">
-              <div className="w-14 h-14 bg-orange-100 rounded-full flex items-center justify-center mb-3">
-                <BookOpen className="h-7 w-7 text-orange-600" />
-              </div>
-              <h3 className="text-lg font-semibold text-gray-900 mb-2">Select from Model Library</h3>
-              <p className="text-sm text-gray-600 mb-3">
-                Browse and search a comprehensive collection of validated pharmacometric models with PML code.
-              </p>
-              <div className="flex items-center space-x-6 text-xs text-gray-500">
-                <div>• Pre-validated model structures</div>
-                <div>• Complete PML code examples</div>
-                <div>• Industry standard approaches</div>
-              </div>
-              <div className="mt-3">
-                <Badge variant="secondary">50+ models available</Badge>
-              </div>
-            </CardContent>
-          </Card>
+      {creationMethod === "template" && (
+        <div className="space-y-4">
+          <div className="flex items-center space-x-2">
+            <BookOpen className="h-5 w-5 text-gray-600" />
+            <h2 className="text-lg font-semibold">Choose a Template</h2>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {getAllModelsFlat().map((model) => (
+              <Card
+                key={model.id}
+                className="cursor-pointer hover:shadow-md transition-shadow"
+                onClick={() => handleTemplateSelect(model)}
+              >
+                <CardHeader className="pb-3">
+                  <div className="flex items-start justify-between">
+                    <CardTitle className="text-base">{model.name}</CardTitle>
+                    <Badge
+                      variant="outline"
+                      className={
+                        model.complexity === "Basic"
+                          ? "bg-green-100 text-green-800"
+                          : model.complexity === "Intermediate"
+                            ? "bg-yellow-100 text-yellow-800"
+                            : "bg-red-100 text-red-800"
+                      }
+                    >
+                      {model.complexity}
+                    </Badge>
+                  </div>
+                  <p className="text-sm text-gray-600">{model.description}</p>
+                </CardHeader>
+                <CardContent className="pt-0">
+                  <div className="flex items-center justify-between text-xs text-gray-500">
+                    <span>{model.parameters} params</span>
+                    <span>{model.equations} equations</span>
+                  </div>
+                  <div className="flex flex-wrap gap-1 mt-2">
+                    {model.tags.slice(0, 3).map((tag) => (
+                      <Badge key={tag} variant="secondary" className="text-xs">
+                        {tag}
+                      </Badge>
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
         </div>
-      </CardContent>
-    </Card>
+      )}
+    </div>
   )
 }
